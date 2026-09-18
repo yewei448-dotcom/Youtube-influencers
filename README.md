@@ -12,21 +12,38 @@
 
 ### 1. 安装 Python 3
 
-macOS 自带；Windows 去 [python.org](https://www.python.org) 下载安装（勾选 Add Python to PATH）。
+**macOS**：系统自带，无需安装。
+
+**Windows**：
+1. 打开 [python.org/downloads](https://www.python.org/downloads/)
+2. 下载安装包，双击运行
+3. ⚠️ **底部一定勾选「Add Python to PATH」**
+4. 点 Install Now
 
 ### 2. 安装依赖
 
+打开终端，运行：
+
+**macOS**（终端 App）：
 ```bash
 pip3 install streamlit pandas requests openpyxl
 ```
 
+**Windows**（按 `Win + R` 输入 `cmd` 回车，打开命令提示符）：
+```
+pip install streamlit pandas requests openpyxl
+```
+
 ### 3. 配置（必须）
 
-复制 `email_config.ini.example` 为 `email_config.ini`，填上你的配置：
+把 `email_config.ini.example` 复制一份，改名为 `email_config.ini`，用文本编辑器打开填上配置：
 
+**macOS**：
 ```bash
 cp email_config.ini.example email_config.ini
 ```
+
+**Windows**：在文件夹里右键 `email_config.ini.example` → 复制 → 粘贴 → 改名为 `email_config.ini`，用记事本打开。
 
 编辑 `email_config.ini`：
 
@@ -46,8 +63,14 @@ auth_code = 你的SMTP授权码
 
 ## 启动
 
+**macOS**：
 ```bash
 python3 -m streamlit run youtube_workbench.py
+```
+
+**Windows**（在命令提示符里，先 cd 到文件夹）：
+```
+python -m streamlit run youtube_workbench.py
 ```
 
 浏览器打开 http://localhost:8501
