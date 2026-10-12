@@ -207,6 +207,8 @@ def log_sent_email(email, name, product, coop_type, status, error=""):
         "合作类型": coop_type,
         "状态": status,
         "错误": error,
+        "回信次数": 0,
+        "回信状态": "从未回信",
     }])
     if _os.path.exists(MAIL_LOG_FILE):
         existing = pd.read_csv(MAIL_LOG_FILE, dtype=str)
@@ -218,3 +220,185 @@ def load_mail_log():
     if _os.path.exists(MAIL_LOG_FILE):
         return pd.read_csv(MAIL_LOG_FILE, dtype=str)
     return pd.DataFrame()
+
+# ============ 回信同步（IMAP） ============
+IMAP_SERVER = "imap.qiye.aliyun.com"
+IMAP_PORT = 993
+
+def sync_replies():
+    """连接 IMAP，统计每个已联系达人的回信次数，返回 {邮箱: 次数}"""
+    import imaplib, re
+    from email import message_from_bytes
+    import pandas as pd
+
+    cfg = load_smtp_config()
+    log = load_mail_log()
+    if log.empty or "邮箱" not in log.columns:
+        return {}
+    target_emails = set(str(e).strip().lower() for e in log["邮箱"].dropna() if str(e).strip())
+    if not target_emails:
+        return {}
+
+    counts = {e: 0 for e in target_emails}
+    try:
+        imap = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        imap.login(cfg["email"], cfg["auth_code"])
+        imap.select("INBOX")
+        status, data = imap.search(None, "ALL")
+        if status == "OK" and data and data[0]:
+            ids = data[0].split()
+            for i in range(0, len(ids), 50):
+                batch = ids[i:i+50]
+                idset = ",".join(b.decode() for b in batch)
+                typ, msgs = imap.fetch(idset, "(BODY.PEEK[HEADER.FIELDS (FROM)])")
+                if typ != "OK":
+                    continue
+                for resp in msgs:
+                    if isinstance(resp, tuple):
+                        msg = message_from_bytes(resp[1])
+                        frm = msg.get("From", "")
+                        m = re.search(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', frm)
+                        if m:
+                            addr = m.group(0).lower()
+                            if addr in target_emails:
+                                counts[addr] += 1
+        imap.logout()
+    except Exception as e:
+        print(f"IMAP 同步失败: {e}")
+    return counts
+
+
+def update_reply_status():
+    """同步回信，更新邮件库的「回信次数」「回信状态」「对方报价」，返回同步的达人数"""
+    import pandas as pd
+    details = extract_reply_quotes()
+    if not details:
+        return 0
+    log = load_mail_log()
+    if log.empty:
+        return 0
+    if "回信次数" not in log.columns:
+        log["回信次数"] = ""
+    if "回信状态" not in log.columns:
+        log["回信状态"] = ""
+    if "对方报价" not in log.columns:
+        log["对方报价"] = ""
+    for i, row in log.iterrows():
+        e = str(row.get("邮箱", "")).strip().lower()
+        d = details.get(e, {"次数": 0, "报价": None})
+        n = d["次数"]
+        q = d["报价"]
+        log.at[i, "回信次数"] = n
+        if q is not None:
+            log.at[i, "对方报价"] = q
+        cur = str(row.get("回信状态", ""))
+        if cur in ("已回复", "已拒绝"):
+            continue
+        if n == 0:
+            log.at[i, "回信状态"] = "从未回信"
+        else:
+            log.at[i, "回信状态"] = f"已回信待处理（第{n}次）"
+    log.to_csv(MAIL_LOG_FILE, index=False, encoding="utf-8-sig")
+    return len(details)
+
+
+def extract_quote(text):
+    """从文本提取报价数字（$数字 或 数字USD/EUR等）"""
+    import re
+    if not text:
+        return None
+    m = re.search(r'\$\s*(\d+(?:[.,]\d+)?)', text)
+    if m:
+        return float(m.group(1).replace(',', ''))
+    m = re.search(r'(\d+(?:[.,]\d+)?)\s*(?:USD|usd|dollars|美元|美金|EUR|eur|euros|欧元)', text)
+    if m:
+        return float(m.group(1).replace(',', ''))
+    return None
+
+
+def _get_body(msg):
+    """从 email message 提取纯文本正文（处理 MIME 编码）"""
+    import re
+    if msg.is_multipart():
+        for part in msg.walk():
+            ct = part.get_content_type()
+            if ct == "text/plain":
+                payload = part.get_payload(decode=True)
+                if payload:
+                    return payload.decode(part.get_content_charset() or "utf-8", errors="ignore")
+        for part in msg.walk():
+            if part.get_content_type() == "text/html":
+                payload = part.get_payload(decode=True)
+                if payload:
+                    text = payload.decode(part.get_content_charset() or "utf-8", errors="ignore")
+                    return re.sub(r'<[^>]+>', ' ', text)
+    else:
+        payload = msg.get_payload(decode=True)
+        if payload:
+            return payload.decode(msg.get_content_charset() or "utf-8", errors="ignore")
+    return ""
+
+
+def extract_reply_quotes():
+    """提取每个已联系达人最新回信的次数和报价，返回 {邮箱: {"次数": n, "报价": x}}"""
+    import imaplib, re
+    from email import message_from_bytes
+
+    cfg = load_smtp_config()
+    log = load_mail_log()
+    if log.empty or "邮箱" not in log.columns:
+        return {}
+    target_emails = set(str(e).strip().lower() for e in log["邮箱"].dropna() if str(e).strip())
+    if not target_emails:
+        return {}
+
+    result = {e: {"次数": 0, "报价": None} for e in target_emails}
+    try:
+        imap = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+        imap.login(cfg["email"], cfg["auth_code"])
+        imap.select("INBOX")
+        status, data = imap.search(None, "ALL")
+        if status != "OK" or not data or not data[0]:
+            imap.logout()
+            return result
+        ids = data[0].split()
+
+        # 第一步：fetch FROM，找到匹配的邮件
+        matched = {}
+        for i in range(0, len(ids), 50):
+            batch = ids[i:i+50]
+            idset = ",".join(b.decode() for b in batch)
+            typ, msgs = imap.fetch(idset, "(BODY.PEEK[HEADER.FIELDS (FROM)])")
+            if typ != "OK":
+                continue
+            for resp in msgs:
+                if isinstance(resp, tuple) and len(resp) >= 2:
+                    msg = message_from_bytes(resp[1])
+                    frm = msg.get("From", "")
+                    m = re.search(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', frm)
+                    if m:
+                        addr = m.group(0).lower()
+                        if addr in target_emails:
+                            mid = resp[0].split()[0].decode() if isinstance(resp[0], bytes) else str(resp[0])
+                            matched.setdefault(addr, []).append(mid)
+
+        # 第二步：对每个匹配邮箱，取最新邮件，提取报价
+        for addr, mids in matched.items():
+            result[addr]["次数"] = len(mids)
+            try:
+                typ, msgs = imap.fetch(mids[-1], "(BODY.PEEK[])")
+                if typ == "OK":
+                    for resp in msgs:
+                        if isinstance(resp, tuple) and len(resp) >= 2:
+                            msg = message_from_bytes(resp[1])
+                            body = _get_body(msg)
+                            q = extract_quote(body)
+                            if q is not None:
+                                result[addr]["报价"] = q
+                                break
+            except Exception:
+                pass
+        imap.logout()
+    except Exception as e:
+        print(f"提取报价失败: {e}")
+    return result

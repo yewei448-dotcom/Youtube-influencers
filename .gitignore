@@ -1,0 +1,19 @@
+# 敏感配置（含真实 API key、SMTP 授权码、GA4 私钥，绝不能上传）
+email_config.ini
+.env
+ga4_credentials.json
+
+# 本地数据文件（达人库、建联库、邮件库、合作效果，属于业务数据）
+*.csv
+found_channels.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# 脚本输出
+*.xlsx
