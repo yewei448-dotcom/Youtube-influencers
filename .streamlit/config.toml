@@ -1,0 +1,21 @@
+# Local workbench appearance; contains no credentials.
+[theme]
+base = "light"
+primaryColor = "#7275DF"
+backgroundColor = "#F3F5FC"
+secondaryBackgroundColor = "#EEF1FA"
+textColor = "#27334D"
+borderColor = "#DEE4F1"
+showWidgetBorder = true
+baseRadius = "0.8rem"
+buttonRadius = "0.8rem"
+font = "sans-serif"
+linkColor = "#555BC4"
+dataframeBorderColor = "#B4BED4"
+dataframeHeaderBackgroundColor = "#EDF1FC"
+chartCategoricalColors = ["#7275DF", "#5AABD4", "#AA8AD3", "#D3A976", "#D78EA8", "#56ABA1"]
+[theme.sidebar]
+backgroundColor = "#F5F6FC"
+secondaryBackgroundColor = "#EAEEF8"
+textColor = "#27334D"
+borderColor = "#DEE4F1"
