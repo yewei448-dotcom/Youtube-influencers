@@ -1,10 +1,11 @@
-[youtube]
-# YouTube Data API key（在 Google Cloud Console 申请）
-api_key = 在这里填你的YouTube_API_key
+# 首次使用：复制为 email_config.ini，只填写自己的信息。
+# 新增邮箱在工作台“管理发件账号”中配置；授权码保存在系统凭据库。
+# 不要提交个人配置、邮箱授权码或 GA4 服务账号私钥。
 
-[smtp]
-# 阿里邮箱 SMTP 配置
-server = smtp.qiye.aliyun.com
-port = 465
-email = 你的发件邮箱地址
-auth_code = 你的SMTP授权码
+[youtube]
+api_key =
+
+# 可选：不使用 GA4 时保持留空。
+[ga4]
+property_id =
+credentials_file =

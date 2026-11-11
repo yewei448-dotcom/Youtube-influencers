@@ -1,0 +1,19 @@
+# Python 3.9+. Streamlit UI and local data handling.
+streamlit==1.50.0
+pandas==2.3.3
+requests
+openpyxl
+toml
+
+# Optional GA4 features and the existing Google Trends page.
+google-auth
+pytrends
+
+# Operating-system credential storage; no authorization codes in source files.
+keyring==24.3.1
+
+# IANA time zones for Windows and hosts without a system time-zone database.
+tzdata
+
+# pandas Styler used by the creator tables.
+Jinja2>=3.1.2

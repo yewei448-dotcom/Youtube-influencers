@@ -1,7 +1,2 @@
-streamlit
-pandas
-requests
-openpyxl
-feedparser
-pytrends
-google-auth
+# Main installation entry point; keep one workbench dependency list.
+-r requirements-workbench.txt
